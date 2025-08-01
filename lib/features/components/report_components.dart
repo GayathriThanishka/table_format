@@ -30,7 +30,7 @@ pw.Widget labelTextSmall(
     child: pw.Text(
       text,
       style: pw.TextStyle(
-        fontSize: 7,
+        fontSize: 5,
         fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
         color: textColor,
       ),

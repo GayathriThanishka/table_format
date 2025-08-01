@@ -5,175 +5,239 @@ import 'package:pdf/widgets.dart' as pw;
 import 'dart:typed_data';
 
 class FinalInspectionPlan {
-  static pw.Widget generateHeader(
-    Uint8List? logo,
-    // FinalInspectionModel finalInspectionData,
-  ) {
-    return _buildHeader(
-      logo,
-      // finalInspectionData,
+  static pw.Widget generateHeader(Uint8List? logo, FinalInspectionModel model) {
+    return pw.Column(
+      mainAxisAlignment: pw.MainAxisAlignment.start,
+      children: [_buildHeader(logo), _buildTable(model), _buildFooter()],
     );
   }
 
-  static _buildHeader(Uint8List? logo) {
+  static pw.Widget _buildHeader(Uint8List? logo) {
     return pw.Container(
-      margin: pw.EdgeInsets.only(bottom: 10),
       decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
       child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
         children: [
-          // 1st Row
-          pw.Container(
-            height: 30,
-            child: pw.Row(
-              children: [
-                pw.Expanded(flex: 1,
-                  child: pw.Container(
-                    padding: pw.EdgeInsets.all(2),
-                    child: logo != null
-                        ? pw.Image(pw.MemoryImage(logo), fit: pw.BoxFit.contain)
-                        : pw.Center(
-                            child: pw.Text(
-                              'IQAA',
-                              style: pw.TextStyle(
-                                fontSize: 16,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                verticalDivider(h: double.maxFinite),
-                pw.Expanded(
-                  child: pw.Center(
-                    child: pw.Text(
-                      "FINE COATS (P) LTD",
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        fontWeight: pw.FontWeight.bold,
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Container(
+                width: 60,
+                height: 60,
+                padding: pw.EdgeInsets.all(5),
+                child: logo != null
+                    ? pw.Image(pw.MemoryImage(logo), fit: pw.BoxFit.contain)
+                    : pw.Center(
+                        child: pw.Text(
+                          'IQAA',
+                          style: pw.TextStyle(fontSize: 8),
+                        ),
                       ),
-                    ),
+              ),
+
+              verticalDivider(h: 60),
+
+              // Company Name
+              pw.Expanded(
+                child: pw.Center(
+                  child: pw.Text(
+                    "FINE COATS (P) LTD",
+                    style: pw.TextStyle(fontSize: 12),
                   ),
                 ),
-              ],
+              ),
+
+              // Title
+            ],
+          ),
+
+          rowDivider(),
+
+          pw.Container(
+            padding: pw.EdgeInsets.all(10),
+            alignment: pw.Alignment.center,
+            child: pw.Text(
+              "FINAL INSPECTION PLAN",
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(fontSize: 10),
             ),
           ),
-          // 2nd Row
-          pw.Container(
-            height: 40,
-            decoration: pw.BoxDecoration(
-              border: pw.Border(top: pw.BorderSide(width: 1)),
-            ),
-            child: pw.Row(
-              children: [
-                pw.Expanded(child:pw.Center(child:labelText("FINAL INSPECTION PLAN") ) ),
-              ],
-            ),
+
+          rowDivider(),
+
+          // 2nd Row: Details Table
+          pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      labelText("PART NAME:"),
+                      rowDivider(),
+                      labelText("DRAWING NO:"),
+                      rowDivider(),
+                      labelText("MATERIAL:"),
+                      rowDivider(),
+                      labelText("ID NO:"),
+                      rowDivider(),
+                    ],
+                  ),
+                ),
+              ),
+              verticalDivider(h: 81),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      labelText("CUSTOMER NAME:"),
+                      rowDivider(),
+                      labelText("P.O NO/DATE"),
+                      rowDivider(),
+                      labelText("NCR.IF ANY QTY"),
+                      rowDivider(),
+                      labelText("ACC.QTY:"),
+                      rowDivider(),
+                    ],
+                  ),
+                ),
+              ),
+              verticalDivider(h: 81),
+              pw.Expanded(
+                child: pw.Container(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+
+                    children: [
+                      labelText("FIR NO:"),
+                      rowDivider(),
+                      labelText("DATE:"),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
-    // 3rd Row
-    //       pw.Container(
-    //         height: 40,
-    //         decoration: pw.BoxDecoration(
-    //           border: pw.Border(top: pw.BorderSide(width: 1)),
-    //         ),
-    //         child: pw.Row(
-    //           children: [
-    //             pw.Expanded(child: labelText("Part Name")),
-    //             verticalDivider(h: double.maxFinite),
-    //             pw.Expanded(
-    //               flex: 3,
-    //               child: pw.Row(
-    //                 children: [
-    //                   pw.Expanded(
-    //                     child: labelText(details.partName, isBold: true),
-    //                   ),
-    //                   verticalDivider(h: double.maxFinite),
-    //                   pw.Expanded(child: labelText("Part Application")),
-    //                   verticalDivider(h: double.maxFinite),
-    //                   pw.Expanded(
-    //                     child: pw.Center(
-    //                       child: labelText("-", textColor: PdfColors.white),
-    //                     ),
-    //                   ),
-
-    //                   pw.Expanded(
-    //                     child: labelText("-", textColor: PdfColors.white),
-    //                   ),
-
-    //                   pw.Expanded(
-    //                     child: pw.Center(
-    //                       child: labelText("-", textColor: PdfColors.white),
-    //                     ),
-    //                   ),
-    //                   verticalDivider(h: double.maxFinite),
-    //                   pw.Expanded(child: labelText("Project")),
-    //                   verticalDivider(h: double.maxFinite),
-    //                   pw.Expanded(child: pw.Center(child: labelText("-"))),
-    //                   verticalDivider(h: double.maxFinite),
-    //                   pw.Expanded(child: labelText("Location")),
-    //                 ],
-    //               ),
-    //             ),
-    //             verticalDivider(h: double.maxFinite),
-    //             pw.Expanded(
-    //               child: labelText(
-    //                 '329/1B1 Sayanmmal Buildings Muppandalyam (post), Alanpalayam',
-    //                 isBold: true,
-    //               ),
-    //             ),
-    //           ],
-    //         ),
-    //       ),
-    //     ],
-    //   ),
-    // );
   }
 
-  // Helper method to build form fields
+  static pw.Widget _buildTable(FinalInspectionModel model) {
+    // Define table headers
+    final headers = [
+      'S.No',
+      'Drg Location',
+      'Parameters',
+      'Drg Specification',
+      'Key Char',
+      'Evaluation',
+      'Inst Id No',
+      'Observed Dimensions',
+      'Remarks',
+    ];
 
-  // Method to generate the complete PDF document
-  static Future<Uint8List> generatePDF({
-    Uint8List? logo,
-    String partName = '',
-    String customerName = '',
-    String firNo = '',
-    String drawingNo = '',
-    String poNoDate = '',
-    String material = '',
-    String ncrQty = '',
-    String date = '',
-    String idNo = '',
-    String accQty = '',
-  }) async {
-    final pdf = pw.Document();
+    // Table data from the model
+    final data = model.qualityPlanTableData;
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: pw.EdgeInsets.all(20),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              generateHeader(logo),
-              pw.SizedBox(height: 20),
-              // Add more content here as needed for the inspection plan
-              pw.Text(
-                'Inspection Details:',
-                style: pw.TextStyle(
-                  fontSize: 12,
-                  fontWeight: pw.FontWeight.bold,
+    return pw.Table(
+      border: pw.TableBorder.all(width: 0.5),
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      children: [
+        // Header Row
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: headers
+              .map(
+                (header) => pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    header,
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 9,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  ),
                 ),
-              ),
-              // Add inspection tables, checkboxes, etc. here
+              )
+              .toList(),
+        ),
+
+        // Data Rows
+        ...data.map(
+          (row) => pw.TableRow(
+            children: row
+                .map(
+                  (cell) => pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      cell,
+                      style: const pw.TextStyle(fontSize: 9),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildFooter() {
+    return pw.Container(
+      decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [pw.Expanded(child: pw.Container(
+              child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start,children: [ labelText("CONCLUTION:"),
+              verticalDivider(h: 20),
+              labelText("ALL DIMENSIONS ARE INSPECTED AND ACCEPTED"),])
+            ))
+             
             ],
-          );
-        },
+          ),
+          rowDivider(),
+          pw.Container(
+            
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                children: [
+                  labelText("INSPECTED BY:"),
+                  verticalDivider(h: 20),
+                  labelText("VERIFIED BY"),
+                  verticalDivider(h: 20),
+                  labelText("APPROVED BY"),
+                ],
+              ),
+            
+          ),
+          rowDivider(),
+          pw.Container(
+        
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                children: [
+                  labelText("DATE:"),
+                  verticalDivider(h: 20),
+                  labelText("DATE:"),
+                  verticalDivider(h: 20),
+                  labelText("DATE:"),
+                ],
+              ),
+            
+          ),
+        ],
       ),
     );
-
-    return pdf.save();
   }
 }
