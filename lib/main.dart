@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:kovaii_fine_coat/features/HOME/home.dart';
+
+import 'package:kovaii_fine_coat/features/ui/final_inspection_ui.dart';
+import 'package:kovaii_fine_coat/features/ui/raw_material_report.dart';
+
 
 void main() {
   runApp(const MainApp());
@@ -10,8 +13,10 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Home()
+    return MaterialApp(debugShowCheckedModeBanner: false,
+      home: 
+      //RawMaterialInspection()
+      InspectionReportPage()
     );
   }
 }
