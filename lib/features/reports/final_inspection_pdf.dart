@@ -1,12 +1,44 @@
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:kovaii_fine_coat/features/components/report_components.dart';
+import 'package:flutter/services.dart';
+import 'package:kovaii_fine_coat/constant/images.dart';
+import 'package:kovaii_fine_coat/csv/csv_loader.dart';
+import 'package:kovaii_fine_coat/features/report_components/report_components.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
 
-class PDFInspectionReportGenerator {
-  static Future<Uint8List> generatePDF() async {
+class FinalInspectionReportGenerator {
+  static Future<void> savePdf({
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo,
+    required List<Map<String, dynamic>> dataRows, // dynamic rows
+  }) async {
     final pdf = pw.Document();
+
+    //load image
+
+     final logoImage = (await rootBundle.load(
+      AppImages.logo,
+    )).buffer.asUint8List();
+    
+
+    // Find format number
+
+    final csvData = await loadCsvFile("assets/csv/formatNo.csv");
+    final routeCardRow = csvData.firstWhere(
+      (row) => row["FORMAT NAME"] == "FINAL INSPECTION REPORT",
+      orElse: () => {},
+    );
+
+    final formatNo = routeCardRow["FORMAT NO"] ?? "";
+    final revisionNo = routeCardRow["REVISION NO"] ?? "";
+
+//PDF Page
 
     pdf.addPage(
       pw.MultiPage(
@@ -14,55 +46,112 @@ class PDFInspectionReportGenerator {
         margin: const pw.EdgeInsets.all(15),
         build: (pw.Context context) {
           return [
-            _buildPDFContent(),
+            _buildPDFContent(logoImage: logoImage,
+              dataRows: dataRows,
+              drawingNo: drawingNo,
+              drawingName: drawingName,
+              material: material,
+              customer: customer,
+              operationNo: operationNo,
+            ),
           ];
         },
+        footer: (context) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+
+            // Left corner 
+
+            pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              margin: const pw.EdgeInsets.only(left: 10),
+              child: labelText("Format No: $formatNo _$revisionNo "),
+            ),
+
+            // Right corner
+
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(right: 10),
+              child: labelText(
+                "Page ${context.pageNumber} of ${context.pagesCount}",
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
-    return pdf.save();
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File("${dir.path}/final_inspection.pdf");
+    final bytes = await pdf.save();
+    await file.writeAsBytes(bytes);
+
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'final_inspection.pdf',
+    );
   }
 
-  static pw.Widget _buildPDFContent() {
+  static pw.Widget _buildPDFContent({
+    required List<Map<String, dynamic>> dataRows,
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo,
+    required Uint8List logoImage
+  }) {
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.black, width: 0.5),
       ),
       child: pw.Column(
         children: [
-          _buildPDFHeader(),
+          _buildPDFHeader(logoImage:logoImage,
+            drawingNo: drawingNo,
+            drawingName: drawingName,
+            material: material,
+            customer: customer,
+            operationNo: operationNo,
+          ),
           _buildPDFMainHeaderRow(),
-          
-          // Data Rows
-          _buildPDFDataRow(1, "", "TOTAL LENGTH", "1051.00(+0.00/-0.50)", "Y", "VERNIER CALIPER", "KFC/D/VC/001"),
-          _buildPDFDataRow(2, "...............", "SLOT LENGTH", "10.00 ±0.20", "Y", "DIGITAL VERNIER CALIPER", "KFC/D/VC/098"),
-          _buildPDFDataRow(3, "...............", "SLOT LENGTH", "25.00 ±0.20", "Y", "DIGITAL VERNIER CALIPER", "KFC/D/VC/098"),
-          _buildPDFDataRow(4, "...............", "SLOT REF LENGTH", "53.50 ±0.30", "Y", "DIGITAL VERNIER CALIPER", "KFC/D/VC/098"),
-          _buildPDFDataRow(5, "...............", "SLOT WIDTH", "21.50 ±0.20", "Y", "DIGITAL VERNIER CALIPER", "KFC/D/VC/098"),
-          _buildPDFDataRow(6, "...............", "SLOT WIDTH", "14.00 ±0.20", "Y", "DIGITAL VERNIER CALIPER", "KFC/D/VC/098"),
-          _buildPDFDataRow(7, "...............", "STRAIGHTNESS UPTO 1051MM", "0.50", "Y", "FEELER GAUGE", "..............."),
-          _buildPDFDataRow(8, "...............", "TWIST UPTO 1051MM", "0.50", "Y", "FEELER GAUGE", "..............."),
-          _buildPDFDataRow(9, "...............", "SURFACE FINISH", "NO SCRATCH & LINE MARK", "Y", "VISUAL", "..............."),
-          _buildPDFDataRow(10, "...............", "SURFACE TREATMENT WHITE ANODIZE THICKNESS", "20 - 25 MICRON", "Y", "DIGITAL THICKNESS GAUGE", "KFC/D/THK/045"),
-          _buildPDFDataRow(11, "...............", "ANODIZING COLOR", "BRIGHT NATURAL", "Y", "VISUAL", "..............."),
-          _buildPDFDataRow(12, "...............", "STRAIGHTNESS ERROR IN CONCAVE SHAPE", "0.00 TO 0.50", "Y", "FEELER GAUGE", "..............."),
-          _buildPDFDataRow(13, "...............", "APPEARANCE", "NO BURR, DENT & DAMAGES", "Y", "VISUAL", "..............."),
-          
-          // Empty rows
-          _buildPDFEmptyRow(14),
-          _buildPDFEmptyRow(15),
-          
-          // Conclusion Row
+
+    
+          ...dataRows.asMap().entries.map((entry) {
+            final index = entry.key + 1;
+            final row = entry.value;
+            return _buildPDFDataRow(
+              index,
+              row["orgLocation"] ?? "",
+              row["parameters"] ?? "",
+              row["specification"] ?? "",
+              row["keyChar"] ?? "",
+              row["evaluation"] ?? "",
+              row["instIdNo"] ?? "",
+              (row["observed"] as List<String>? ?? []),
+              row["remarks"] ?? "",
+            );
+          }),
+
+        
+          for (int i = dataRows.length + 1; i <= 15; i++) _buildPDFEmptyRow(i),
+
           _buildPDFConclusionRow(),
-          
-          // Footer Rows
           _buildPDFFooterRow(),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildPDFHeader() {
+  // ------------------- Header -------------------
+  static pw.Widget _buildPDFHeader( {
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo, required Uint8List logoImage,
+  }) {
     return pw.Container(
       decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
       child: pw.Column(
@@ -73,23 +162,27 @@ class PDFInspectionReportGenerator {
             child: pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                pw.Container(
-                  width: 100,
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.black, width: 1),
-                  ),
-                  alignment: pw.Alignment.center,
-                  child: labelText(
-                    "kfc",
-                    
-                  ),
-                ),
-                pw.Container(width: 1, height: 60, color: PdfColors.black),
+                 pw.Container(
+          height: 50,
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.black, width: 0.5),
+          ),
+          child: pw.Container(
+            width: 100,
+            padding: const pw.EdgeInsets.all(2),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(right: pw.BorderSide(width: 0.5)),
+            ),
+            child: pw.Image(pw.MemoryImage(logoImage), fit: pw.BoxFit.contain),
+          ),
+        ),
+                pw.Container(width: 0.1, height: 60, color: PdfColors.black),
                 pw.Expanded(
                   child: pw.Center(
                     child: labelText(
-                      "KOVAII FINE COAT (P) LIMITED",isBold: true,isHeader: true
-                      
+                      "KOVAII FINE COAT (P) LIMITED",
+                      isBold: true,
+                      isHeader: true,
                     ),
                   ),
                 ),
@@ -101,8 +194,9 @@ class PDFInspectionReportGenerator {
             padding: const pw.EdgeInsets.all(10),
             alignment: pw.Alignment.center,
             child: labelText(
-              "FINAL INSPECTION PLAN CUM REPORT",isBold: true,isHeader: true
-             
+              "FINAL INSPECTION PLAN CUM REPORT",
+              isBold: true,
+              isHeader: true,
             ),
           ),
           pw.Container(height: 1, color: PdfColors.black),
@@ -114,13 +208,13 @@ class PDFInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("PART NAME:",isBold: true),
+                    labelText("PART NAME: $drawingName", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DRAWING NO:",isBold: true),
+                    labelText("DRAWING NO: $drawingNo", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("MATERIAL:",isBold: true),
+                    labelText("MATERIAL: $material", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("ID NO:",isBold: true),
+                    labelText("OPERATION NO: $operationNo", isBold: true),
                   ],
                 ),
               ),
@@ -130,13 +224,13 @@ class PDFInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("CUSTOMER NAME:",isBold: true),
+                    labelText("CUSTOMER NAME: $customer", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("P.O NO/DATE",isBold: true),
+                    labelText("P.O NO/DATE", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("NCR.IF ANY QTY",isBold: true),
+                    labelText("NCR.IF ANY QTY", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("ACC.QTY:",isBold: true),
+                    labelText("ACC.QTY:", isBold: true),
                   ],
                 ),
               ),
@@ -145,9 +239,9 @@ class PDFInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("FIR NO:",isBold: true),
+                    labelText("FIR NO:", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DATE:",isBold: true),
+                    labelText("DATE:", isBold: true),
                   ],
                 ),
               ),
@@ -158,7 +252,7 @@ class PDFInspectionReportGenerator {
     );
   }
 
-
+  // ------------------- Table Header -------------------
   static pw.Widget _buildPDFMainHeaderRow() {
     return pw.Container(
       height: 50,
@@ -168,9 +262,9 @@ class PDFInspectionReportGenerator {
       child: pw.Row(
         children: [
           _buildPDFHeaderCell("SL\nNO", 30),
-          _buildPDFHeaderCell("ORG.\nLOCATION", 53),
+          _buildPDFHeaderCell("DRG.\nLOCATION", 53),
           _buildPDFHeaderCell("PARAMETERS", 100),
-          _buildPDFHeaderCell("ORG. SPECIFICATION", 100),
+          _buildPDFHeaderCell("DRG. SPECIFICATION", 100),
           _buildPDFHeaderCell("KEY\nCHAR", 40),
           _buildPDFHeaderCell("EVALUATION", 100),
           _buildPDFHeaderCell("INST ID NO", 80),
@@ -181,6 +275,7 @@ class PDFInspectionReportGenerator {
     );
   }
 
+  // ------------------- Data Row -------------------
   static pw.Widget _buildPDFDataRow(
     int slNo,
     String orgLocation,
@@ -189,6 +284,8 @@ class PDFInspectionReportGenerator {
     String keyChar,
     String evaluation,
     String instIdNo,
+    List<String> observedValues,
+    String remarks,
   ) {
     return pw.Container(
       height: 35,
@@ -204,13 +301,14 @@ class PDFInspectionReportGenerator {
           _buildPDFDataCell(keyChar, 40),
           _buildPDFDataCell(evaluation, 100),
           _buildPDFDataCell(instIdNo, 80),
-          _buildPDFObservedDimensionsGrid(),
-          _buildPDFDataCell("", 60),
+          _buildPDFObservedDimensionsGrid(observedValues),
+          _buildPDFDataCell(remarks, 60),
         ],
       ),
     );
   }
 
+  // ------------------- Empty Row -------------------
   static pw.Widget _buildPDFEmptyRow(int slNo) {
     return pw.Container(
       height: 35,
@@ -220,20 +318,21 @@ class PDFInspectionReportGenerator {
       child: pw.Row(
         children: [
           _buildPDFDataCell(slNo.toString(), 30),
-          _buildPDFDataCell("...............", 53),
+          _buildPDFDataCell("", 53),
           _buildPDFDataCell("", 100),
           _buildPDFDataCell("", 100),
           _buildPDFDataCell("", 40),
           _buildPDFDataCell("", 100),
           _buildPDFDataCell("", 80),
-          _buildPDFObservedDimensionsGrid(),
+          _buildPDFObservedDimensionsGrid([]),
           _buildPDFDataCell("", 60),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildPDFObservedDimensionsGrid() {
+  // ------------------- Observed Grid -------------------
+  static pw.Widget _buildPDFObservedDimensionsGrid(List<String> values) {
     return pw.Container(
       width: 250,
       child: pw.Row(
@@ -242,6 +341,7 @@ class PDFInspectionReportGenerator {
           (index) => pw.Expanded(
             child: pw.Container(
               height: double.infinity,
+              alignment: pw.Alignment.center,
               decoration: pw.BoxDecoration(
                 border: pw.Border(
                   right: pw.BorderSide(
@@ -250,6 +350,11 @@ class PDFInspectionReportGenerator {
                   ),
                 ),
               ),
+              child: pw.Text(
+                index < values.length ? values[index] : "",
+                style: const pw.TextStyle(fontSize: 9),
+                textAlign: pw.TextAlign.center,
+              ),
             ),
           ),
         ),
@@ -257,6 +362,7 @@ class PDFInspectionReportGenerator {
     );
   }
 
+  // ------------------- Conclusion -------------------
   static pw.Widget _buildPDFConclusionRow() {
     return pw.Container(
       height: 40,
@@ -266,36 +372,26 @@ class PDFInspectionReportGenerator {
           bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
         ),
       ),
-      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start,
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Expanded(child: pw.Container(
-      
-            alignment: pw.Alignment.centerLeft,
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                right: pw.BorderSide(color: PdfColors.black, width: 0.5),
+          pw.Expanded(
+            child: pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  right: pw.BorderSide(color: PdfColors.black, width: 0.5),
+                ),
               ),
+              child: labelText("CONCLUSION :", isBold: true),
             ),
-            child: labelText(
-              "CONCLUSION :",isBold: true
-              
-            ),
-          ), ),
-          pw.Expanded(child: pw.Container(
-           
-           alignment: pw.Alignment.centerLeft,
-            child: labelText(
-              "ALL DIMENSIONS ARE INSPECTED AND ACCEPTED",isBold: true,
-              
-            ),
-          ), )
-         
-         
+          )
         ],
       ),
     );
   }
 
+  // ------------------- Footer -------------------
   static pw.Widget _buildPDFFooterRow() {
     return pw.Container(
       height: 80,
@@ -311,26 +407,18 @@ class PDFInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
                           bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
                         ),
                       ),
-                      child: labelText(
-                        "INSPECTED BY :",isBold: true
-                        
-                      ),
+                      child: labelText("INSPECTED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :",isBold: true
-                        
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -347,26 +435,18 @@ class PDFInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
                           bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
                         ),
                       ),
-                      child: labelText(
-                        "VERIFIED BY :",isBold: true
-                        
-                      ),
+                      child: labelText("VERIFIED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :",
-                        isBold: true
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -383,26 +463,18 @@ class PDFInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
                           bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
                         ),
                       ),
-                      child: labelText(
-                        "APPROVED BY :",
-                        isBold: true
-                      ),
+                      child: labelText("APPROVED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                    //  padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :"
-                        ,isBold: true
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -414,6 +486,7 @@ class PDFInspectionReportGenerator {
     );
   }
 
+  // ------------------- Cell Builders -------------------
   static pw.Widget _buildPDFHeaderCell(String text, double width) {
     return pw.Container(
       width: width,
@@ -448,24 +521,6 @@ class PDFInspectionReportGenerator {
         maxLines: 2,
         overflow: pw.TextOverflow.clip,
       ),
-    );
-  }
-
-  // Method to generate and save/share PDF
-  static Future<void> generateAndShowPDF() async {
-    final pdfBytes = await generatePDF();
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdfBytes,
-      name: 'Final_Inspection_Report.pdf',
-    );
-  }
-
-  // Method to save PDF to device
-  static Future<void> savePDF() async {
-    final pdfBytes = await generatePDF();
-    await Printing.sharePdf(
-      bytes: pdfBytes,
-      filename: 'Final_Inspection_Report.pdf',
     );
   }
 }

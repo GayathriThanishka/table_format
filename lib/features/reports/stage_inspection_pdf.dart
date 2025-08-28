@@ -1,12 +1,40 @@
-import 'dart:typed_data';
-import 'package:kovaii_fine_coat/features/components/report_components.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:kovaii_fine_coat/constant/images.dart';
+import 'package:kovaii_fine_coat/csv/csv_loader.dart';
+import 'package:kovaii_fine_coat/features/report_components/report_components.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
 
 class StageInspectionReportGenerator {
-  static Future<Uint8List> generatePDF() async {
+  static Future<void> savePdf({
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo,
+    required List<Map<String, dynamic>> dataRows, // dynamic rows
+  }) async {
     final pdf = pw.Document();
+
+    //load logo image
+
+    final logoImage = (await rootBundle.load(
+      AppImages.logo,
+    )).buffer.asUint8List();
+
+    // Find format number
+
+    final csvData = await loadCsvFile("assets/csv/formatNo.csv");
+    final routeCardRow = csvData.firstWhere(
+      (row) => row["FORMAT NAME"] == "FINAL INSPECTION REPORT",
+      orElse: () => {},
+    );
+
+    final formatNo = routeCardRow["FORMAT NO"] ?? "";
+    final revisionNo = routeCardRow["REVISION NO"] ?? "";
 
     pdf.addPage(
       pw.MultiPage(
@@ -14,55 +42,110 @@ class StageInspectionReportGenerator {
         margin: const pw.EdgeInsets.all(15),
         build: (pw.Context context) {
           return [
-            _buildPDFContent(),
+            _buildPDFContent(
+              logoImage: logoImage,
+              dataRows: dataRows,
+              drawingNo: drawingNo,
+              drawingName: drawingName,
+              material: material,
+              customer: customer,
+              operationNo: operationNo,
+            ),
           ];
         },
+
+        footer: (context) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            // Left corner (Format info from CSV)
+            pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              margin: const pw.EdgeInsets.only(left: 10),
+              child: labelText("Format No: $formatNo _$revisionNo "),
+            ),
+
+            // Right corner (Page X of Y)
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(right: 10),
+              child: labelText(
+                "Page ${context.pageNumber} of ${context.pagesCount}",
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
-    return pdf.save();
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File("${dir.path}/stage_inspection.pdf");
+    final bytes = await pdf.save();
+    await file.writeAsBytes(bytes);
+
+    await Printing.sharePdf(bytes: bytes, filename: 'stage_inspection.pdf');
   }
 
-  static pw.Widget _buildPDFContent() {
+  static pw.Widget _buildPDFContent({
+    required List<Map<String, dynamic>> dataRows,
+    required Uint8List logoImage,
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo,
+  }) {
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.black, width: 0.5),
       ),
       child: pw.Column(
         children: [
-          _buildPDFHeader(),
+          _buildPDFHeader(
+            logoImage: logoImage,
+            drawingNo: drawingNo,
+            drawingName: drawingName,
+            material: material,
+            customer: customer,
+            operationNo: operationNo,
+          ),
           _buildPDFMainHeaderRow(),
-          
-          // Data Rows
-          _buildPDFDataRow(1, "", "", "", "", "", ""),
-          _buildPDFDataRow(2, "", "", "", "", "", ""),
-          _buildPDFDataRow(3, "", "", "", "", "", ""),
-          _buildPDFDataRow(4, "", "", "", "", "", ""),
-          _buildPDFDataRow(5, "", "", "", "", "", ""),
-          _buildPDFDataRow(6, "", "", "", "", "", ""),
-          _buildPDFDataRow(7, "", "", "", "", "", ""),
-          _buildPDFDataRow(8, "", "", "", "", "", ""),
-          _buildPDFDataRow(9, "", "", "", "", "", ""),
-          _buildPDFDataRow(10, "", "", "", "", "", ""),
-          _buildPDFDataRow(11, "", "", "", "", "", ""),
-          _buildPDFDataRow(12, "", "", "", "", "", ""),
-          _buildPDFDataRow(13, "", "", "", "", "", ""),
-          
-          // Empty rows
-          _buildPDFEmptyRow(14),
-          _buildPDFEmptyRow(15),
-          
-          // Conclusion Row
+
+          // Dynamic rows
+          ...dataRows.asMap().entries.map((entry) {
+            final index = entry.key + 1;
+            final row = entry.value;
+            return _buildPDFDataRow(
+              index,
+              row["orgLocation"] ?? "",
+              row["parameters"] ?? "",
+              row["specification"] ?? "",
+              row["keyChar"] ?? "",
+              row["evaluation"] ?? "",
+              row["instIdNo"] ?? "",
+              (row["observed"] as List<String>? ?? []),
+              row["remarks"] ?? "",
+            );
+          }),
+
+          // Fill with empty rows to maintain table height
+          for (int i = dataRows.length + 1; i <= 15; i++) _buildPDFEmptyRow(i),
+
           _buildPDFConclusionRow(),
-          
-          // Footer Rows
           _buildPDFFooterRow(),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildPDFHeader() {
+  // ------------------- Header -------------------
+  static pw.Widget _buildPDFHeader({
+    required String drawingNo,
+    required String drawingName,
+    required String material,
+    required String customer,
+    required String operationNo,
+    required Uint8List logoImage,
+  }) {
     return pw.Container(
       decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
       child: pw.Column(
@@ -74,22 +157,29 @@ class StageInspectionReportGenerator {
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Container(
-                  width: 100,
+                  height: 50,
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.black, width: 1),
+                    border: pw.Border.all(color: PdfColors.black, width: 0.5),
                   ),
-                  alignment: pw.Alignment.center,
-                  child: labelText(
-                    "kfc",
-                    
+                  child: pw.Container(
+                    width: 100,
+                    padding: const pw.EdgeInsets.all(2),
+                    decoration: const pw.BoxDecoration(
+                      border: pw.Border(right: pw.BorderSide(width: 0.5)),
+                    ),
+                    child: pw.Image(
+                      pw.MemoryImage(logoImage),
+                      fit: pw.BoxFit.contain,
+                    ),
                   ),
                 ),
-                pw.Container(width: 1, height: 60, color: PdfColors.black),
+                pw.Container(width: 0.1, height: 60, color: PdfColors.black),
                 pw.Expanded(
                   child: pw.Center(
                     child: labelText(
-                      "KOVAII FINE COAT (P) LIMITED",isBold: true,isHeader: true
-                      
+                      "KOVAII FINE COAT (P) LIMITED",
+                      isBold: true,
+                      isHeader: true,
                     ),
                   ),
                 ),
@@ -101,8 +191,9 @@ class StageInspectionReportGenerator {
             padding: const pw.EdgeInsets.all(10),
             alignment: pw.Alignment.center,
             child: labelText(
-              "STAGE INSPECTION PLAN CUM REPORT",isBold: true,isHeader: true
-             
+              "STAGE INSPECTION PLAN CUM REPORT",
+              isBold: true,
+              isHeader: true,
             ),
           ),
           pw.Container(height: 1, color: PdfColors.black),
@@ -114,13 +205,13 @@ class StageInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("PART NAME:",isBold: true),
+                    labelText("PART NAME: $drawingName", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DRAWING NO:",isBold: true),
+                    labelText("DRAWING NO: $drawingNo", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("MATERIAL:",isBold: true),
+                    labelText("MATERIAL: $material", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("ID NO:",isBold: true),
+                    labelText("OPERATION NO: $operationNo", isBold: true),
                   ],
                 ),
               ),
@@ -130,13 +221,19 @@ class StageInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("CUSTOMER NAME:",isBold: true),
+                    pw.Row(
+                      children: [
+                        labelText("CUSTOMER NAME: ", isBold: true),
+                        labelText("$customer"),
+                      ],
+                    ),
+
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("P.O NO/DATE",isBold: true),
+                    labelText("P.O NO/DATE", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("NCR.IF ANY QTY",isBold: true),
+                    labelText("NCR.IF ANY QTY", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("ACC.QTY:",isBold: true),
+                    labelText("ACC.QTY:", isBold: true),
                   ],
                 ),
               ),
@@ -145,9 +242,9 @@ class StageInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("FIR NO:",isBold: true),
+                    labelText("FIR NO:", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DATE:",isBold: true),
+                    labelText("DATE:", isBold: true),
                   ],
                 ),
               ),
@@ -158,12 +255,14 @@ class StageInspectionReportGenerator {
     );
   }
 
-
+  // ------------------- Table Header -------------------
   static pw.Widget _buildPDFMainHeaderRow() {
     return pw.Container(
       height: 50,
       decoration: const pw.BoxDecoration(
-        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 0.5)),
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+        ),
       ),
       child: pw.Row(
         children: [
@@ -181,6 +280,7 @@ class StageInspectionReportGenerator {
     );
   }
 
+  // ------------------- Data Row -------------------
   static pw.Widget _buildPDFDataRow(
     int slNo,
     String orgLocation,
@@ -189,11 +289,15 @@ class StageInspectionReportGenerator {
     String keyChar,
     String evaluation,
     String instIdNo,
+    List<String> observedValues,
+    String remarks,
   ) {
     return pw.Container(
       height: 35,
       decoration: const pw.BoxDecoration(
-        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 0.5)),
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+        ),
       ),
       child: pw.Row(
         children: [
@@ -204,18 +308,21 @@ class StageInspectionReportGenerator {
           _buildPDFDataCell(keyChar, 40),
           _buildPDFDataCell(evaluation, 100),
           _buildPDFDataCell(instIdNo, 80),
-          _buildPDFObservedDimensionsGrid(),
-          _buildPDFDataCell("", 60),
+          _buildPDFObservedDimensionsGrid(observedValues),
+          _buildPDFDataCell(remarks, 60),
         ],
       ),
     );
   }
 
+  // ------------------- Empty Row -------------------
   static pw.Widget _buildPDFEmptyRow(int slNo) {
     return pw.Container(
       height: 35,
       decoration: const pw.BoxDecoration(
-        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 0.5)),
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+        ),
       ),
       child: pw.Row(
         children: [
@@ -226,14 +333,15 @@ class StageInspectionReportGenerator {
           _buildPDFDataCell("", 40),
           _buildPDFDataCell("", 100),
           _buildPDFDataCell("", 80),
-          _buildPDFObservedDimensionsGrid(),
+          _buildPDFObservedDimensionsGrid([]),
           _buildPDFDataCell("", 60),
         ],
       ),
     );
   }
 
-  static pw.Widget _buildPDFObservedDimensionsGrid() {
+  // ------------------- Observed Grid -------------------
+  static pw.Widget _buildPDFObservedDimensionsGrid(List<String> values) {
     return pw.Container(
       width: 250,
       child: pw.Row(
@@ -242,6 +350,7 @@ class StageInspectionReportGenerator {
           (index) => pw.Expanded(
             child: pw.Container(
               height: double.infinity,
+              alignment: pw.Alignment.center,
               decoration: pw.BoxDecoration(
                 border: pw.Border(
                   right: pw.BorderSide(
@@ -250,6 +359,11 @@ class StageInspectionReportGenerator {
                   ),
                 ),
               ),
+              child: pw.Text(
+                index < values.length ? values[index] : "",
+                style: const pw.TextStyle(fontSize: 9),
+                textAlign: pw.TextAlign.center,
+              ),
             ),
           ),
         ),
@@ -257,6 +371,7 @@ class StageInspectionReportGenerator {
     );
   }
 
+  // ------------------- Conclusion -------------------
   static pw.Widget _buildPDFConclusionRow() {
     return pw.Container(
       height: 40,
@@ -266,28 +381,26 @@ class StageInspectionReportGenerator {
           bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
         ),
       ),
-      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start,
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Expanded(child: pw.Container(
-      
-            alignment: pw.Alignment.centerLeft,
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                right: pw.BorderSide(color: PdfColors.black, width: 0.5),
+          pw.Expanded(
+            child: pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  right: pw.BorderSide(color: PdfColors.black, width: 0.5),
+                ),
               ),
+              child: labelText("CONCLUSION :", isBold: true),
             ),
-            child: labelText(
-              "CONCLUSION :",isBold: true
-              
-            ),
-          ), )
-         
-         
+          ),
         ],
       ),
     );
   }
 
+  // ------------------- Footer -------------------
   static pw.Widget _buildPDFFooterRow() {
     return pw.Container(
       height: 80,
@@ -303,26 +416,21 @@ class StageInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
-                          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+                          bottom: pw.BorderSide(
+                            color: PdfColors.black,
+                            width: 0.5,
+                          ),
                         ),
                       ),
-                      child: labelText(
-                        "INSPECTED BY :",isBold: true
-                        
-                      ),
+                      child: labelText("INSPECTED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :",isBold: true
-                        
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -339,26 +447,21 @@ class StageInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
-                          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+                          bottom: pw.BorderSide(
+                            color: PdfColors.black,
+                            width: 0.5,
+                          ),
                         ),
                       ),
-                      child: labelText(
-                        "VERIFIED BY :",isBold: true
-                        
-                      ),
+                      child: labelText("VERIFIED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :",
-                        isBold: true
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -375,26 +478,21 @@ class StageInspectionReportGenerator {
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                     // padding: const pw.EdgeInsets.all(8),
                       decoration: const pw.BoxDecoration(
                         border: pw.Border(
-                          bottom: pw.BorderSide(color: PdfColors.black, width: 0.5),
+                          bottom: pw.BorderSide(
+                            color: PdfColors.black,
+                            width: 0.5,
+                          ),
                         ),
                       ),
-                      child: labelText(
-                        "APPROVED BY :",
-                        isBold: true
-                      ),
+                      child: labelText("APPROVED BY :", isBold: true),
                     ),
                   ),
                   pw.Expanded(
                     child: pw.Container(
                       alignment: pw.Alignment.centerLeft,
-                    //  padding: const pw.EdgeInsets.all(8),
-                      child: labelText(
-                        "DATE        :"
-                        ,isBold: true
-                      ),
+                      child: labelText("DATE        :", isBold: true),
                     ),
                   ),
                 ],
@@ -406,6 +504,7 @@ class StageInspectionReportGenerator {
     );
   }
 
+  // ------------------- Cell Builders -------------------
   static pw.Widget _buildPDFHeaderCell(String text, double width) {
     return pw.Container(
       width: width,
@@ -440,24 +539,6 @@ class StageInspectionReportGenerator {
         maxLines: 2,
         overflow: pw.TextOverflow.clip,
       ),
-    );
-  }
-
-  // Method to generate and save/share PDF
-  static Future<void> generateAndShowPDF() async {
-    final pdfBytes = await generatePDF();
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdfBytes,
-      name: 'stage_Inspection_Report.pdf',
-    );
-  }
-
-  // Method to save PDF to device
-  static Future<void> savePDF() async {
-    final pdfBytes = await generatePDF();
-    await Printing.sharePdf(
-      bytes: pdfBytes,
-      filename: 'Stage_Inspection_Report.pdf',
     );
   }
 }

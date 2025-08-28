@@ -4,17 +4,18 @@ import 'package:pdf/widgets.dart' as pw;
 
 labelText(
   String text, {
-bool isHeader=false,
+  bool isHeader = false,
   PdfColor textColor = PdfColors.black,
   bool isBold = false,
+  bool isletterSpacing = false,
 }) {
   return pw.Padding(
     padding: pw.EdgeInsets.only(left: 5, top: 4, bottom: 4),
     child: pw.Text(
       text,
       style: pw.TextStyle(
-        
-        fontSize: isHeader? 15:10,
+        letterSpacing: isletterSpacing ? 2.0 : 0,
+        fontSize: isHeader ? 15 : 8,
         fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
         color: textColor,
       ),
@@ -22,17 +23,18 @@ bool isHeader=false,
   );
 }
 
-pw.Widget labelTextSmall(
+pw.Widget labelTextSubHead(
   String text, {
   PdfColor textColor = PdfColors.black,
   bool isBold = false,
+  bool isTableHeader=false
 }) {
   return pw.Padding(
     padding: pw.EdgeInsets.only(left: 2, top: 4, bottom: 4),
     child: pw.Text(
       text,
       style: pw.TextStyle(
-        fontSize: 5,
+        fontSize: isTableHeader?9:10,
         fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
         color: textColor,
       ),
@@ -100,21 +102,19 @@ pw.Widget globalFooter({
   );
 }
 
-
-Widget labelText1(String text,{ bool isBold = false,bool isHeader=false}) {
+Widget labelText1(String text, {bool isBold = false, bool isHeader = false}) {
   return Padding(
     padding: EdgeInsets.only(left: 5, top: 4, bottom: 4),
     child: Text(
       text,
       style: TextStyle(
-        fontSize:isHeader?13: 10,
+        fontSize: isHeader ? 13 : 10,
         fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
         color: Colors.black,
       ),
     ),
   );
 }
-
 
 Widget divider1() {
   return Divider(height: 1, color: Colors.black);
@@ -125,14 +125,9 @@ Widget rowDivider1({
   double thickness = 0.5,
   Color color = Colors.black,
 }) {
-  return Container(width: width, height: thickness, color:color);
+  return Container(width: width, height: thickness, color: color);
 }
 
 Widget verticalDivider1({double h = 80}) {
-  return Container(
-    width: 0.5,
-    height: h,
-    color: Colors.black,
-  );
-}                                             
-   
+  return Container(width: 0.5, height: h, color: Colors.black);
+}
