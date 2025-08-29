@@ -229,11 +229,11 @@ class StageInspectionReportGenerator {
                     ),
 
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("P.O NO/DATE", isBold: true),
+                    labelText("LOT QTY", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
                     labelText("NCR.IF ANY QTY", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("ACC.QTY:", isBold: true),
+                    labelText("INS.QTY:", isBold: true),
                   ],
                 ),
               ),
@@ -242,9 +242,12 @@ class StageInspectionReportGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    labelText("FIR NO:", isBold: true),
+                     labelText("DATE: ${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}", isBold: true),
+                    labelText("M/C NAME & NO:", isBold: true),
+                    
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DATE:", isBold: true),
+                    labelText("OPERATION NO:", isBold: true),
+                   
                   ],
                 ),
               ),

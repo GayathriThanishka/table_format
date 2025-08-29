@@ -135,7 +135,7 @@ class FinalInspectionReportGenerator {
           }),
 
         
-          for (int i = dataRows.length + 1; i <= 15; i++) _buildPDFEmptyRow(i),
+        
 
           _buildPDFConclusionRow(),
           _buildPDFFooterRow(),
@@ -241,7 +241,7 @@ class FinalInspectionReportGenerator {
                   children: [
                     labelText("FIR NO:", isBold: true),
                     pw.Container(height: 1, color: PdfColors.black),
-                    labelText("DATE:", isBold: true),
+                    labelText("DATE:${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}", isBold: true),
                   ],
                 ),
               ),

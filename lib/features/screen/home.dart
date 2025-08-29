@@ -69,13 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                AppStrings.description,
-                                style: GoogleFonts.dmSans(
-                                  color: Palettes.textColor,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              
                             ],
                           ),
                         ),

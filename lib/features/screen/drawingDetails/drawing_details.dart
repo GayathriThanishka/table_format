@@ -8,6 +8,7 @@ import 'package:kovaii_fine_coat/components/common_text_field.dart';
 import 'package:kovaii_fine_coat/constant/app_strings.dart';
 import 'package:kovaii_fine_coat/constant/images.dart';
 import 'package:kovaii_fine_coat/csv/csv_loader.dart';
+import 'package:kovaii_fine_coat/db/db_service.dart';
 import 'package:kovaii_fine_coat/features/reports/final_inspection_pdf.dart';
 import 'package:kovaii_fine_coat/features/reports/ncr_report.dart';
 import 'package:kovaii_fine_coat/features/reports/raw_material_pdf.dart';
@@ -51,6 +52,12 @@ class _DrawingDetailsState extends State<DrawingDetails>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
+     DBService.init().then((_) async {
+    await DBService.clearTable();   // optional: reset table each time
+    await loadCsvToDb("assets/csv/parameters - Sheet1 (5).csv");
+  });
+
+
     // Add listeners to update right-side card in real-time
     drawingNoController.addListener(() => setState(() {}));
     poNumberController.addListener(() => setState(() {}));
@@ -77,7 +84,7 @@ class _DrawingDetailsState extends State<DrawingDetails>
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(AppImages.logScreen),
+            image: AssetImage(AppImages.screenBackground),
             fit: BoxFit.cover,
           ),
         ),
@@ -99,26 +106,7 @@ class _DrawingDetailsState extends State<DrawingDetails>
                     ),
                   ),
                   Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const DrawingDetails(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Palettes.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Refresh"),
-                  ),
-                  const SizedBox(width: 15),
+
                   // Logout button
                   ElevatedButton.icon(
                     onPressed: () {
@@ -212,7 +200,7 @@ class _DrawingDetailsState extends State<DrawingDetails>
 
   // Left side form
   Widget _buildReportDetailsForm() {
-    print("partDetails: $partDetails");
+  
 
     return SingleChildScrollView(
       child: Container(
@@ -374,6 +362,109 @@ class _DrawingDetailsState extends State<DrawingDetails>
         ),
       ),
     );
+  }
+
+  void _handleGenerateReport() async {
+    bool isValid = false;
+
+    if (_tabController.index == 0) {
+      // Report Details tab
+      isValid = _reportFormKey.currentState!.validate();
+    } else if (_tabController.index == 1) {
+      // RouteCard Details tab
+      isValid = _routeCardFormKey.currentState!.validate();
+    }
+
+    if (!isValid) {
+      _showPopup(context, "Please fill all required fields");
+      return;
+    }
+
+    if (selectedOperations.isEmpty) {
+      _showPopup(context, 'Select at least one operation');
+      return;
+    }
+
+    try {
+       final rows = await DBService.fetchByDrawing(drawingNoController.text.trim());
+
+    if (rows.isEmpty) {
+      _showPopup(context, "No records found for drawing: ${drawingNoController.text}");
+      return;
+    }
+
+    // convert into map for PDF
+    final dataRows = rows.map((p) => {
+      "orgLocation": "",
+      "parameters": p.parameter,
+      "specification": p.specification,
+      "keyChar": "",
+      "evaluation": p.evaluation,
+      "instIdNo": p.instIdNo,
+      "observed": <String>[],
+      "remarks": "",
+    }).toList();
+       await FinalInspectionReportGenerator.savePdf(
+      drawingNo: drawingNoController.text,
+      drawingName: _getDrawingName(drawingNoController.text),
+      material: selectedMaterial ?? '',
+      customer: selectedCustomer ?? '',
+      operationNo: routeCardNoController.text,
+      dataRows: dataRows,
+    );
+      await StageInspectionReportGenerator.savePdf(
+        drawingNo: drawingNoController.text,
+        drawingName: _getDrawingName(drawingNoController.text),
+        material: selectedMaterial ?? '',
+        customer: selectedCustomer ?? '',
+        operationNo: "", dataRows: [],
+      );
+      await RawMaterialInspectionPDF.savePDF(
+        drawingNo: drawingNoController.text,
+        drawingName: _getDrawingName(drawingNoController.text),
+        poNumber: poNumberController.text,
+        poDate: poDateController.text,
+        dcNumber: dcNumberController.text,
+        dcDate: dcDateController.text,
+        minNumber: minNumberController.text,
+        customer: selectedCustomer ?? '',
+        material: selectedMaterial ?? '',
+      );
+      await ReworkNotePDF.savePDF(
+        partName: _getDrawingName(drawingNoController.text),
+        routeCardNo: routeCardNoController.text,
+        partNumber: drawingNoController.text,
+      );
+      await ScrapDisposalFormPDF.savePDF(
+        partName: _getDrawingName(drawingNoController.text),
+        routeCardNo: routeCardNoController.text,
+        partNumber: drawingNoController.text,
+      );
+      await NcrPdfGenerator.sharePDF();
+
+      await RouteCardPdf.savePdf(
+        routeCardNo: routeCardNoController.text,
+        date: "",
+        partName: _getDrawingName(drawingNoController.text),
+        drawingNo: drawingNoController.text,
+        drawingRevNo: "",
+        poNo: poNumberController.text,
+        poDate: poDateController.text,
+        operations: selectedOperations
+            .map(
+              (op) => {
+                "opNo": op["operation #"] ?? "",
+                "wc": op["Work center"] ?? "",
+                "param": op["Parameters"] ?? "",
+              },
+            )
+            .toList(),
+      );
+
+      _showPopup(context, "Reports generated successfully");
+    } catch (e) {
+      _showPopup(context, "Error while generating PDFs: $e");
+    }
   }
 
   String _getDrawingName(String drawingNo) {
@@ -540,87 +631,7 @@ class _DrawingDetailsState extends State<DrawingDetails>
     );
   }
 
-  void _handleGenerateReport() async {
-    bool isValid = false;
-
-    if (_tabController.index == 0) {
-      // Report Details tab
-      isValid = _reportFormKey.currentState!.validate();
-    } else if (_tabController.index == 1) {
-      // RouteCard Details tab
-      isValid = _routeCardFormKey.currentState!.validate();
-    }
-
-    if (!isValid) {
-      _showPopup(context, "Please fill all required fields");
-      return;
-    }
-
-    if (selectedOperations.isEmpty) {
-      _showPopup(context, 'Select at least one operation');
-      return;
-    }
-
-    try {
-      await FinalInspectionReportGenerator.savePdf( drawingNo: drawingNoController.text,
-        drawingName: _getDrawingName(drawingNoController.text),
-        material: selectedMaterial ?? '',
-        customer: selectedCustomer ?? '',
-        operationNo: "", dataRows: [],);
-      await StageInspectionReportGenerator.savePdf(
-        drawingNo: drawingNoController.text,
-        drawingName: _getDrawingName(drawingNoController.text),
-        material: selectedMaterial ?? '',
-        customer: selectedCustomer ?? '',
-        operationNo: "", dataRows: [],
-      );
-      await RawMaterialInspectionPDF.savePDF(
-        drawingNo: drawingNoController.text,
-        drawingName: _getDrawingName(drawingNoController.text),
-        poNumber: poNumberController.text,
-        poDate: poDateController.text,
-        dcNumber: dcNumberController.text,
-        dcDate: dcDateController.text,
-        minNumber: minNumberController.text,
-        customer: selectedCustomer ?? '',
-        material: selectedMaterial ?? '',
-      );
-      await ReworkNotePDF.savePDF(
-        partName: _getDrawingName(drawingNoController.text),
-        routeCardNo: routeCardNoController.text,
-        partNumber: drawingNoController.text,
-      );
-      await ScrapDisposalFormPDF.savePDF(
-        partName: _getDrawingName(drawingNoController.text),
-        routeCardNo: routeCardNoController.text,
-        partNumber: drawingNoController.text,
-      );
-      await NcrPdfGenerator.sharePDF();
-
-      await RouteCardPdf.savePdf(
-        routeCardNo: routeCardNoController.text,
-        date: "",
-        partName: _getDrawingName(drawingNoController.text),
-        drawingNo: drawingNoController.text,
-        drawingRevNo: "",
-        poNo: poNumberController.text,
-        poDate: poDateController.text,
-        operations: selectedOperations
-            .map(
-              (op) => {
-                "opNo": op["operation #"] ?? "",
-                "wc": op["Work center"] ?? "",
-                "param": op["Parameters"] ?? "",
-              },
-            )
-            .toList(),
-      );
-
-      _showPopup(context, "Reports generated successfully");
-    } catch (e) {
-      _showPopup(context, "Error while generating PDFs: $e");
-    }
-  }
+  
 
   Widget _buildDetailItem(String title, String value) {
     return Padding(
@@ -654,13 +665,58 @@ class _DrawingDetailsState extends State<DrawingDetails>
 void _showPopup(BuildContext context, String message) {
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      content: Text(message),
+    builder: (context) => AlertDialog(
+      title: Center(child: Text("Success")),
+
+      content: Text(
+        "Report generated successfully.",
+        textAlign: TextAlign.center,
+      ),
+      actionsAlignment: MainAxisAlignment.center,
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text("OK"),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 100,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    side: BorderSide(color: Palettes.primaryColor),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DrawingDetails(),
+                    ),
+                  );
+                },
+                child: const Text("OK"),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 100,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Palettes.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  "Cancel",
+                  style: TextStyle(color: Palettes.whiteColor),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     ),

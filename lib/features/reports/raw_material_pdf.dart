@@ -283,7 +283,7 @@ class RawMaterialInspectionPDF {
     required String dcDate,
   }) {
     final rows = [
-      {"label": "DATE", "value": ""},
+      {"label": "DATE", "value": "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}",},
       {"label": "", "value": ""},
       {"label": "", "value": ""},
       {"label": "D.C NO:", "value": dcNumber},

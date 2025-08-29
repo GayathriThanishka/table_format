@@ -24,15 +24,14 @@ class RouteCardPdf {
 
     final csvData = await loadCsvFile("assets/csv/formatNo.csv");
 
-// Find ROUTE CARD entry
-final routeCardRow = csvData.firstWhere(
-  (row) => row["FORMAT NAME"] == "ROUTE CARD",
-  orElse: () => {},
-);
+    // Find ROUTE CARD entry
+    final routeCardRow = csvData.firstWhere(
+      (row) => row["FORMAT NAME"] == "ROUTE CARD",
+      orElse: () => {},
+    );
 
-final formatNo = routeCardRow["FORMAT NO"] ?? "";
-final revisionNo = routeCardRow["REVISION NO"] ?? "";
-
+    final formatNo = routeCardRow["FORMAT NO"] ?? "";
+    final revisionNo = routeCardRow["REVISION NO"] ?? "";
 
     Uint8List? logoImage;
     try {
@@ -41,7 +40,7 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
       print('Logo not found: $e');
     }
 
-       pdf.addPage(
+    pdf.addPage(
       pw.MultiPage(
         maxPages: 50,
         pageFormat: PdfPageFormat.a4,
@@ -56,30 +55,26 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
           poNo,
           poDate,
         ),
-       footer: (context) => pw.Row(
-  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-  children: [
-    // Left corner (Format info from CSV)
-    pw.Container(
-      alignment: pw.Alignment.centerLeft,
-      margin: const pw.EdgeInsets.only(left: 10),
-      child: labelText(
-        "Format No: $formatNo _$revisionNo ",
-        
-      ),
-    ),
+        footer: (context) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            // Left corner (Format info from CSV)
+            pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              margin: const pw.EdgeInsets.only(left: 10),
+              child: labelText("Format No: $formatNo _$revisionNo "),
+            ),
 
-    // Right corner (Page X of Y)
-    pw.Container(
-      alignment: pw.Alignment.centerRight,
-      margin: const pw.EdgeInsets.only(right: 10),
-      child: labelText(
-        "Page ${context.pageNumber} of ${context.pagesCount}",
-        
-      ),
-    ),
-  ],
-),
+            // Right corner (Page X of Y)
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(right: 10),
+              child: labelText(
+                "Page ${context.pageNumber} of ${context.pagesCount}",
+              ),
+            ),
+          ],
+        ),
 
         build: (pw.Context context) {
           return [
@@ -104,8 +99,6 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
       bytes: await pdf.save(),
       filename: 'route_card.pdf',
     );
-
-
   }
 
   // Header Section
@@ -184,7 +177,7 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
                         children: [
                           labelText("DATE:", isBold: true),
                           pw.Text(
-                            date,
+                            "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}",
                             style: const pw.TextStyle(fontSize: 10),
                           ),
                         ],
@@ -213,16 +206,15 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
             ),
             child: pw.Row(
               children: [
-                pw.Expanded(child: _headerCell("PART NAME:", fontSize: 9, isBold: true)),
-                pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
-                  flex: 4,
-                  child: _headerCell(partName, fontSize: 9,),
+                  child: _headerCell("PART NAME:", fontSize: 9, isBold: true),
                 ),
+                pw.Container(width: 1, color: PdfColors.black),
+                pw.Expanded(flex: 4, child: _headerCell(partName, fontSize: 9)),
                 pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
                   flex: 3,
-                  child: _headerCell("REV NO: ", fontSize: 9, isBold: true),
+                  child: _headerCell("REV NO: 0", fontSize: 9, isBold: true),
                 ),
               ],
             ),
@@ -235,16 +227,18 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
             ),
             child: pw.Row(
               children: [
-                pw.Expanded(child: _headerCell("DRAWING NO:", fontSize: 9, isBold: true)),
+                pw.Expanded(
+                  child: _headerCell("DRAWING NO:", fontSize: 9, isBold: true),
+                ),
                 pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
                   flex: 4,
-                  child: _headerCell(drawingNo, fontSize: 9, ),
+                  child: _headerCell(drawingNo, fontSize: 9),
                 ),
                 pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
                   flex: 3,
-                  child: _headerCell("REV NO: $drawingRevNo", fontSize: 9),
+                  child: _headerCell("REV NO:0", fontSize: 9),
                 ),
               ],
             ),
@@ -257,16 +251,26 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
             ),
             child: pw.Row(
               children: [
-                pw.Expanded(child: _headerCell("P.O NO / DATE:", fontSize: 9, isBold: true)),
+                pw.Expanded(
+                  child: _headerCell(
+                    "P.O NO / DATE:",
+                    fontSize: 9,
+                    isBold: true,
+                  ),
+                ),
                 pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
                   flex: 4,
-                  child: _headerCell(poNo, fontSize: 9),
+                  child: _headerCell("${poNo}/ ${poDate}", fontSize: 9),
                 ),
                 pw.Container(width: 1, color: PdfColors.black),
                 pw.Expanded(
                   flex: 3,
-                  child: _headerCell("MIN NO/DATE: $poDate", fontSize: 9, isBold: true),
+                  child: _headerCell(
+                    "MIN NO/DATE: ",
+                    fontSize: 9,
+                    isBold: true,
+                  ),
                 ),
               ],
             ),
@@ -686,41 +690,36 @@ final revisionNo = routeCardRow["REVISION NO"] ?? "";
   }
 
   // Bottom reference row
-static pw.TableRow _buildBottomReferenceRow(String text) {
-  return pw.TableRow(
-    children: [
-      // First cell (height comes from text or fixed if needed)
-      pw.Container(height: 35,
-        width: 200,
-        padding: const pw.EdgeInsets.all(6),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(width: 0.5),
-        ),
-        child: pw.Align(
-          alignment: pw.Alignment.centerLeft,
-          child: pw.Text(
-            text,
-            style: pw.TextStyle(
-              fontSize: 9,
-              fontWeight: pw.FontWeight.bold,
+  static pw.TableRow _buildBottomReferenceRow(String text) {
+    return pw.TableRow(
+      children: [
+        // First cell (height comes from text or fixed if needed)
+        pw.Container(
+          height: 35,
+          width: 200,
+          padding: const pw.EdgeInsets.all(6),
+          decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+          child: pw.Align(
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text(
+              text,
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
             ),
           ),
         ),
-      ),
 
-      pw.Container(
-        width: 380,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            left: pw.BorderSide.none,
-            bottom: pw.BorderSide.none,
-            right: pw.BorderSide.none,
-            top: pw.BorderSide.none,
+        pw.Container(
+          width: 380,
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              left: pw.BorderSide.none,
+              bottom: pw.BorderSide.none,
+              right: pw.BorderSide.none,
+              top: pw.BorderSide.none,
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 }
