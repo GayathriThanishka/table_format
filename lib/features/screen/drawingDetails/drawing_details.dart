@@ -93,10 +93,10 @@ class _DrawingDetailsState extends State<DrawingDetails>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Image.asset(AppImages.logo),
-                  SizedBox(width: 200),
+              
                   Text(
                     AppStrings.companyName,
                     style: GoogleFonts.dmSans(
@@ -104,9 +104,8 @@ class _DrawingDetailsState extends State<DrawingDetails>
                       fontSize: 25,
                       fontWeight: FontWeight.bold,
                     ),
+        
                   ),
-                  Spacer(),
-
                   // Logout button
                   ElevatedButton.icon(
                     onPressed: () {
@@ -450,6 +449,7 @@ class _DrawingDetailsState extends State<DrawingDetails>
         drawingRevNo: "",
         poNo: poNumberController.text,
         poDate: poDateController.text,
+       // minNO: minNumberController.text,
         operations: selectedOperations
             .map(
               (op) => {

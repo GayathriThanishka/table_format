@@ -254,7 +254,7 @@ class RawMaterialInspectionPDF {
       "DESCRIPTION": drawingName,
       "DRAWING NO": drawingNo,
       "MATERIAL SPEC": material,
-      "APPROVED SOURCE": "",
+      "APPROVED SOURCE": "YES       NO",
     };
 
     return pw.Column(
@@ -289,7 +289,7 @@ class RawMaterialInspectionPDF {
       {"label": "D.C NO:", "value": dcNumber},
       {"label": "DATE:", "value": dcDate},
       {"label": "", "value": ""},
-      {"label": "LOT QTY:", "value": "NA"},
+      {"label": "LOT QTY:", "value": ""},
       {"label": "NA", "value": ""},
     ];
 
